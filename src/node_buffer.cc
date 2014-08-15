@@ -465,6 +465,66 @@ static inline void Swizzle(char* start, unsigned int len) {
   }
 }
 
+template <typename T, enum Endianness endianness>
+void ReadGeneric(const FunctionCallbackInfo<Value>& args) {
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
+  bool doAssert = !args[1]->BooleanValue();
+  size_t offset;
+
+  CHECK_NOT_OOB(ParseArrayIndex(args[0], 0, &offset));
+
+  if (doAssert) {
+    size_t len = Length(args.This());
+    if (offset + sizeof(T) > len || offset + sizeof(T) < offset)
+      return env->ThrowRangeError("Trying to read beyond buffer length");
+  }
+
+  union NoAlias {
+    T val;
+    char bytes[sizeof(T)];
+  };
+
+  union NoAlias na;
+  const void* data = args.This()->GetIndexedPropertiesExternalArrayData();
+  const char* ptr = static_cast<const char*>(data) + offset;
+  memcpy(na.bytes, ptr, sizeof(na.bytes));
+  if (endianness != GetEndianness())
+    Swizzle(na.bytes, sizeof(na.bytes));
+
+  args.GetReturnValue().Set(na.val);
+}
+
+void ReadUInt16LE(const FunctionCallbackInfo<Value>& args) {
+  ReadGeneric<uint16_t, kLittleEndian>(args);
+}
+
+void ReadUInt16BE(const FunctionCallbackInfo<Value>& args) {
+  ReadGeneric<uint16_t, kBigEndian>(args);
+}
+
+void ReadUInt32LE(const FunctionCallbackInfo<Value>& args) {
+  ReadGeneric<uint32_t, kLittleEndian>(args);
+}
+
+void ReadUInt32BE(const FunctionCallbackInfo<Value>& args) {
+  ReadGeneric<uint32_t, kBigEndian>(args);
+}
+
+void ReadInt16LE(const FunctionCallbackInfo<Value>& args) {
+  ReadGeneric<int16_t, kLittleEndian>(args);
+}
+
+void ReadInt16BE(const FunctionCallbackInfo<Value>& args) {
+  ReadGeneric<int16_t, kBigEndian>(args);
+}
+
+void ReadInt32LE(const FunctionCallbackInfo<Value>& args) {
+  ReadGeneric<int32_t, kLittleEndian>(args);
+}
+
+void ReadInt32BE(const FunctionCallbackInfo<Value>& args) {
+  ReadGeneric<int32_t, kBigEndian>(args);
+}
 
 template <typename T, enum Endianness endianness>
 void ReadFloatGeneric(const FunctionCallbackInfo<Value>& args) {
@@ -648,6 +708,15 @@ void SetupBufferJS(const FunctionCallbackInfo<Value>& args) {
   NODE_SET_METHOD(proto, "hexWrite", HexWrite);
   NODE_SET_METHOD(proto, "ucs2Write", Ucs2Write);
   NODE_SET_METHOD(proto, "utf8Write", Utf8Write);
+
+  NODE_SET_METHOD(proto, "readUInt16LE", ReadUInt16LE);
+  NODE_SET_METHOD(proto, "readUInt16BE", ReadUInt16BE);
+  NODE_SET_METHOD(proto, "readUInt32LE", ReadUInt32LE);
+  NODE_SET_METHOD(proto, "readUInt32BE", ReadUInt32BE);
+  NODE_SET_METHOD(proto, "readInt16LE", ReadInt16LE);
+  NODE_SET_METHOD(proto, "readInt16BE", ReadInt16BE);
+  NODE_SET_METHOD(proto, "readInt32LE", ReadInt32LE);
+  NODE_SET_METHOD(proto, "readInt32BE", ReadInt32BE);
 
   NODE_SET_METHOD(proto, "readDoubleBE", ReadDoubleBE);
   NODE_SET_METHOD(proto, "readDoubleLE", ReadDoubleLE);
